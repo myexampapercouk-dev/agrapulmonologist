@@ -6,7 +6,7 @@
  *
  * Setup:
  *   1. Go to https://script.google.com → New project, paste this whole file.
- *   2. Change TO_EMAIL to the Gmail address that should receive the requests.
+ *   2. TO_EMAIL is the clinic owner's inbox; change it only if that address changes.
  *   3. Deploy → New deployment → type "Web app".
  *        Execute as: Me        Who has access: Anyone
  *   4. Approve the permissions, then copy the Web app URL (ends in /exec)
@@ -15,7 +15,7 @@
  *   Version "New version" → Deploy (the URL stays the same).
  */
 
-const TO_EMAIL = 'PUT-RECEIVING-EMAIL@gmail.com'; // who receives the requests (comma-separate for several)
+const TO_EMAIL = 'niramayacareceter@gmail.com'; // clinic owner's inbox — receives every request
 const SENDER_NAME = 'Agra Pulmonologist Website';
 
 function doPost(e) {
