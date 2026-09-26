@@ -540,15 +540,16 @@ section[id]{scroll-margin-top:78px}
         <div><span>Sunday</span><b>10.00am – 2.00pm</b></div>
       </div>
     </div>
-    <form id="apptForm" class="reveal">
-      <div><label for="fn">Your Name</label><input id="fn" required></div>
-      <div><label for="fe">Your Email</label><input id="fe" type="email"></div>
-      <div><label for="fp">Your Phone</label><input id="fp" type="tel" required></div>
-      <div><label for="fd">Date of Appointment</label><input id="fd" type="date" required></div>
+    <form id="apptForm" class="reveal" name="appointment" method="POST">
+      <input type="hidden" name="form-name" value="appointment">
+      <p class="hp" aria-hidden="true"><label>Leave this empty <input name="bot-field" tabindex="-1" autocomplete="off"></label></p>
+      <div><label for="fn">Your Name</label><input id="fn" name="name" autocomplete="name" required></div>
+      <div><label for="fe">Your Email</label><input id="fe" name="email" type="email" autocomplete="email"></div>
+      <div><label for="fp">Your Phone</label><input id="fp" name="phone" type="tel" autocomplete="tel" required></div>
+      <div><label for="fd">Date of Appointment</label><input id="fd" name="date" type="date" required></div>
       <div class="full"><label for="ft">Your Time</label>
-        <select id="ft"><option>10 am to 3 pm (Mon to Sat)</option><option>5 pm to 8 pm (Mon to Sat)</option><option>10 am to 2 pm (Sun)</option></select></div>
-      <div class="full"><label for="fm">Your Message</label><textarea id="fm"></textarea></div>
-      <div class="hp" aria-hidden="true"><label for="fw">Website</label><input id="fw" tabindex="-1" autocomplete="off"></div>
+        <select id="ft" name="time"><option>10 am to 3 pm (Mon to Sat)</option><option>5 pm to 8 pm (Mon to Sat)</option><option>10 am to 2 pm (Sun)</option></select></div>
+      <div class="full"><label for="fm">Your Message</label><textarea id="fm" name="message"></textarea></div>
       <div class="full"><button class="btn btn-primary" type="submit" id="fs">Submit</button></div>
       <div class="full form-msg" id="fmsg" role="status" aria-live="polite"></div>
     </form>
@@ -643,29 +644,30 @@ lb.querySelector('.n').onclick = e => { e.stopPropagation(); show(gi + 1); };
 lb.onclick = e => { if (e.target === lb) lb.classList.remove('open'); };
 document.addEventListener('keydown', e => { if (!lb.classList.contains('open')) return; if (e.key === 'Escape') lb.classList.remove('open'); if (e.key === 'ArrowLeft') show(gi - 1); if (e.key === 'ArrowRight') show(gi + 1); });
 
-// appointment -> WhatsApp
+// appointment -> email (Netlify Function send-quote), with WhatsApp as a second option
 document.getElementById('fd').min = new Date().toISOString().split('T')[0];
-// Google Apps Script web app URL (see google-apps-script/Code.gs). Ends in /exec.
-const APPOINTMENT_URL = 'PASTE-YOUR-APPS-SCRIPT-WEB-APP-URL-HERE';
 const form = document.getElementById('apptForm'), fmsg = document.getElementById('fmsg'), fs = document.getElementById('fs');
 const waLink = f => 'https://wa.me/918238440002?text=' + encodeURIComponent(`Appointment request
-Name: ${f.name}
-Phone: ${f.phone}
-Email: ${f.email || '-'}
-Date: ${f.date}
-Time: ${f.time}
-Message: ${f.message || '-'}`);
-form.onsubmit = async e => {
+Name: ${f.get('name')}
+Phone: ${f.get('phone')}
+Email: ${f.get('email') || '-'}
+Date: ${f.get('date')}
+Time: ${f.get('time')}
+Message: ${f.get('message') || '-'}`);
+form.addEventListener('submit', async e => {
   e.preventDefault();
-  const v = id => document.getElementById(id).value.trim();
-  const f = { name: v('fn'), email: v('fe'), phone: v('fp'), date: v('fd'), time: v('ft'), message: v('fm'), website: v('fw') };
+  const payload = new URLSearchParams(new FormData(e.target));
+  payload.set('page', location.pathname);
   fs.disabled = true; fs.textContent = 'Sending…'; fmsg.className = 'full form-msg'; fmsg.textContent = '';
   let res = { ok: false, error: 'Could not reach the server. Please check your connection and try again.' };
   try {
-    // Sent as text/plain so the browser skips the CORS preflight that Apps Script can't answer.
-    const r = await fetch(APPOINTMENT_URL, { method: 'POST', body: JSON.stringify(f) });
-    res = await r.json().catch(() => ({ ok: false, error: 'Something went wrong. Please call or WhatsApp us.' }));
-  } catch {}
+    const r = await fetch('/.netlify/functions/send-quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: payload.toString()
+    });
+    res = await r.json().catch(() => ({ ok: false, error: 'Something went wrong.' }));
+  } catch (err) {}
   fs.disabled = false; fs.textContent = 'Submit';
   if (res.ok) {
     fmsg.className = 'full form-msg ok';
@@ -676,8 +678,8 @@ form.onsubmit = async e => {
     fmsg.innerHTML = '<b></b> <a target="_blank" rel="noopener">Send it on WhatsApp instead</a> or call +91-8238440002.';
     fmsg.querySelector('b').textContent = res.error;
   }
-  fmsg.querySelector('a').href = waLink(f);
-};
+  fmsg.querySelector('a').href = waLink(payload);
+});
 
 // scroll reveal
 const io = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } }), { threshold: .12 });
