@@ -190,6 +190,15 @@ input,select,textarea{width:100%;padding:13px 14px;border:1px solid var(--line);
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--teal);background:#fff;box-shadow:0 0 0 3px var(--teal-l)}
 textarea{min-height:96px;resize:vertical}
 form .btn{justify-content:center;width:100%}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.form-msg{font-size:.9rem;border-radius:10px;padding:0}
+.form-msg:empty{display:none}
+.form-msg.ok,.form-msg.err{padding:14px 16px}
+.form-msg.ok{background:#e7f6ee;color:#135c36}
+.form-msg.err{background:#fdecea;color:#8a2a22}
+.form-msg a{font-weight:600;text-decoration:underline}
+button:disabled{opacity:.7;cursor:wait}
+form{position:relative}
 form .note{font-size:.8rem;color:var(--muted);text-align:center}
 
 /* testimonials */
@@ -524,7 +533,7 @@ section[id]{scroll-margin-top:78px}
     <div class="reveal">
       <span class="eyebrow">Appointment</span>
       <h2>Book Appointment Now</h2>
-      <p style="color:#d4ecee;margin-top:14px">Choose a date and time slot. Your request is sent to the clinic on WhatsApp, and the team will confirm it with you.</p>
+      <p style="color:#d4ecee;margin-top:14px">Choose a date and time slot and send your request. The clinic team will call you to confirm your appointment.</p>
       <div class="hours">
         <div><span>Monday – Saturday</span><b>10.00am – 2.00pm</b></div>
         <div><span>Monday – Saturday</span><b>05.00pm – 8.00pm</b></div>
@@ -539,8 +548,9 @@ section[id]{scroll-margin-top:78px}
       <div class="full"><label for="ft">Your Time</label>
         <select id="ft"><option>10 am to 3 pm (Mon to Sat)</option><option>5 pm to 8 pm (Mon to Sat)</option><option>10 am to 2 pm (Sun)</option></select></div>
       <div class="full"><label for="fm">Your Message</label><textarea id="fm"></textarea></div>
-      <div class="full"><button class="btn btn-primary" type="submit">Submit</button></div>
-      <p class="full note">Opens WhatsApp with your details filled in.</p>
+      <div class="hp" aria-hidden="true"><label for="fw">Website</label><input id="fw" tabindex="-1" autocomplete="off"></div>
+      <div class="full"><button class="btn btn-primary" type="submit" id="fs">Submit</button></div>
+      <div class="full form-msg" id="fmsg" role="status" aria-live="polite"></div>
     </form>
   </div>
 </section>
@@ -635,11 +645,38 @@ document.addEventListener('keydown', e => { if (!lb.classList.contains('open')) 
 
 // appointment -> WhatsApp
 document.getElementById('fd').min = new Date().toISOString().split('T')[0];
-document.getElementById('apptForm').onsubmit = e => {
+// Google Apps Script web app URL (see google-apps-script/Code.gs). Ends in /exec.
+const APPOINTMENT_URL = 'PASTE-YOUR-APPS-SCRIPT-WEB-APP-URL-HERE';
+const form = document.getElementById('apptForm'), fmsg = document.getElementById('fmsg'), fs = document.getElementById('fs');
+const waLink = f => 'https://wa.me/918238440002?text=' + encodeURIComponent(`Appointment request
+Name: ${f.name}
+Phone: ${f.phone}
+Email: ${f.email || '-'}
+Date: ${f.date}
+Time: ${f.time}
+Message: ${f.message || '-'}`);
+form.onsubmit = async e => {
   e.preventDefault();
   const v = id => document.getElementById(id).value.trim();
-  const msg = `Appointment request\nName: ${v('fn')}\nPhone: ${v('fp')}\nEmail: ${v('fe') || '-'}\nDate: ${v('fd')}\nTime: ${v('ft')}\nMessage: ${v('fm') || '-'}`;
-  window.open('https://wa.me/918238440002?text=' + encodeURIComponent(msg), '_blank');
+  const f = { name: v('fn'), email: v('fe'), phone: v('fp'), date: v('fd'), time: v('ft'), message: v('fm'), website: v('fw') };
+  fs.disabled = true; fs.textContent = 'Sending…'; fmsg.className = 'full form-msg'; fmsg.textContent = '';
+  let res = { ok: false, error: 'Could not reach the server. Please check your connection and try again.' };
+  try {
+    // Sent as text/plain so the browser skips the CORS preflight that Apps Script can't answer.
+    const r = await fetch(APPOINTMENT_URL, { method: 'POST', body: JSON.stringify(f) });
+    res = await r.json().catch(() => ({ ok: false, error: 'Something went wrong. Please call or WhatsApp us.' }));
+  } catch {}
+  fs.disabled = false; fs.textContent = 'Submit';
+  if (res.ok) {
+    fmsg.className = 'full form-msg ok';
+    fmsg.innerHTML = '<b>Thank you! Your request has been sent.</b> The clinic will call you to confirm. Need a faster reply? <a target="_blank" rel="noopener">Send it on WhatsApp too</a>.';
+    form.reset();
+  } else {
+    fmsg.className = 'full form-msg err';
+    fmsg.innerHTML = '<b></b> <a target="_blank" rel="noopener">Send it on WhatsApp instead</a> or call +91-8238440002.';
+    fmsg.querySelector('b').textContent = res.error;
+  }
+  fmsg.querySelector('a').href = waLink(f);
 };
 
 // scroll reveal
